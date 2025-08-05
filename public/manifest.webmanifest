@@ -1,0 +1,21 @@
+{
+  "name": "Mesh Messenger",
+  "short_name": "Meshenger",
+  "description": "A decentralized messaging app",
+  "start_url": ".",
+  "display": "standalone",
+  "icons": [
+    {
+      "src": "/favicon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/favicon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    }
+  ]
+}
