@@ -4,5 +4,302 @@ import Layout from "@layouts/layout.astro";
 
 <Layout title="Mesh Messenger" description="A decentralized messaging app">
   <h1>Mesh Messenger</h1>
-  <p>WIP</p>
+  <section>
+    <h2>ed25519</h2>
+    <input
+      id="ed25519-public-key"
+      disabled
+      aria-label="Public ed25519 key"
+      style={{ width: "100%" }}
+    />
+    <button id="generate-ed25519-keypair" style={{ backgroundColor: "#dc2f02" }}
+      >Generate new keypair</button
+    >
+    <button id="copy-ed25519-public-key">Copy public key</button>
+  </section>
+  <section>
+    <h2>Contacts</h2>
+    <textarea
+      id="contacts"
+      rows="8"
+      style={{ width: "100%", resize: "vertical" }}></textarea>
+    <button id="save-contacts">Save</button>
+  </section>
+  <section>
+    <h2>x25519</h2>
+    <input
+      id="x25519-public-key"
+      disabled
+      aria-label="Public x25519 key"
+      style={{ width: "100%" }}
+    />
+    <button id="generate-x25519-keypair" style={{ backgroundColor: "#dc2f02" }}
+      >Generate new keypair</button
+    >
+    <button id="copy-x25519-public-key">Sign and copy public key</button>
+  </section>
+  <section>
+    <h2>Diffie Hellman</h2>
+    <input
+      id="x25519-received-public-key"
+      placeholder="Paste received public key here"
+      aria-label="Received public x25519 key"
+      style={{ width: "100%" }}
+    />
+    <button id="clear-shared-secret" style={{ backgroundColor: "#dc2f02" }}
+      >Clear</button
+    >
+    <button id="find-shared-secret">Find shared secret</button>
+  </section>
+  <section>
+    <h2>XChaCha20-Poly1305</h2>
+    <input
+      id="message"
+      placeholder="Type a message"
+      aria-label="Message"
+      style={{ width: "100%" }}
+    />
+    <section>
+      <button id="encrypt-message">Encrypt</button>
+      <button id="decrypt-message">Decrypt</button>
+    </section>
+    <input
+      id="result"
+      disabled
+      placeholder="Resulting message"
+      aria-label="Resulting message"
+      style={{ width: "100%" }}
+    />
+  </section>
 </Layout>
+
+<script>
+  import { Buffer } from "buffer";
+  import { x25519, ed25519 } from "@noble/curves/ed25519";
+  import { xchacha20poly1305 } from "@noble/ciphers/chacha";
+  import { randomBytes } from "@noble/curves/utils";
+
+  function toBase64(bytes: Uint8Array): string {
+    return Buffer.from(bytes).toString("base64");
+  }
+  function fromBase64(base64: string): Uint8Array {
+    return Buffer.from(base64, "base64");
+  }
+
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+
+  export function toUTF8(message: string): Uint8Array {
+    return encoder.encode(message);
+  }
+
+  export function fromUTF8(bytes: Uint8Array): string {
+    return decoder.decode(bytes);
+  }
+
+  // ed25519
+  const ed25519PublicKeyInput = document.getElementById(
+    "ed25519-public-key"
+  ) as HTMLInputElement;
+  const generateEd25519KeypairButton = document.getElementById(
+    "generate-ed25519-keypair"
+  ) as HTMLButtonElement;
+  const copyEd25519PublicKeyButton = document.getElementById(
+    "copy-ed25519-public-key"
+  ) as HTMLButtonElement;
+
+  if (localStorage.getItem("ed25519") === null) {
+    localStorage.setItem("ed25519", toBase64(ed25519.utils.randomSecretKey()));
+  }
+
+  const ed25519_private = fromBase64(localStorage.getItem("ed25519")!);
+  const ed25519_public = ed25519.getPublicKey(ed25519_private);
+
+  ed25519PublicKeyInput.value = toBase64(ed25519_public);
+
+  generateEd25519KeypairButton.addEventListener("click", () => {
+    if (!confirm("Are you sure?")) return;
+    localStorage.setItem("ed25519", toBase64(ed25519.utils.randomSecretKey()));
+    localStorage.removeItem("x25519");
+    localStorage.removeItem("x25519-received");
+    localStorage.removeItem("shared-secret");
+    window.location.reload();
+  });
+
+  copyEd25519PublicKeyButton.addEventListener("click", async () => {
+    await navigator.clipboard.writeText(ed25519PublicKeyInput.value);
+    alert("Public key copied to clipboard");
+  });
+
+  // Contacts
+  const contactsInput = document.getElementById(
+    "contacts"
+  ) as HTMLTextAreaElement;
+  const saveContactsButton = document.getElementById(
+    "save-contacts"
+  ) as HTMLButtonElement;
+
+  if (localStorage.getItem("contacts") === null) {
+    localStorage.setItem("contacts", "");
+  }
+
+  contactsInput.value = localStorage.getItem("contacts")!;
+
+  saveContactsButton.addEventListener("click", () => {
+    localStorage.setItem("contacts", contactsInput.value);
+  });
+
+  // x25519
+  const x25519PublicKeyInput = document.getElementById(
+    "x25519-public-key"
+  ) as HTMLInputElement;
+  const generateX25519KeypairButton = document.getElementById(
+    "generate-x25519-keypair"
+  ) as HTMLButtonElement;
+  const copyX25519PublicKeyButton = document.getElementById(
+    "copy-x25519-public-key"
+  ) as HTMLButtonElement;
+
+  if (localStorage.getItem("x25519") === null) {
+    localStorage.setItem("x25519", toBase64(x25519.utils.randomSecretKey()));
+  }
+
+  const x25519_private = fromBase64(localStorage.getItem("x25519")!);
+  const x25519_public = x25519.getPublicKey(x25519_private);
+
+  x25519PublicKeyInput.value = toBase64(x25519_public);
+
+  generateX25519KeypairButton.addEventListener("click", () => {
+    if (!confirm("Are you sure?")) return;
+    localStorage.setItem("x25519", toBase64(x25519.utils.randomSecretKey()));
+    localStorage.removeItem("x25519-received");
+    localStorage.removeItem("shared-secret");
+    window.location.reload();
+  });
+
+  copyX25519PublicKeyButton.addEventListener("click", async () => {
+    const signed_x25519_public = ed25519.sign(x25519_public, ed25519_private);
+    await navigator.clipboard.writeText(
+      toBase64(x25519_public) + ":" + toBase64(signed_x25519_public)
+    );
+    alert("Public key and signature copied to clipboard");
+  });
+
+  // Diffie Hellman
+  const x25519ReceivedPublicKeyInput = document.getElementById(
+    "x25519-received-public-key"
+  ) as HTMLInputElement;
+  const clearSharedSecretButton = document.getElementById(
+    "clear-shared-secret"
+  ) as HTMLButtonElement;
+  const findSharedSecretButton = document.getElementById(
+    "find-shared-secret"
+  ) as HTMLButtonElement;
+
+  if (localStorage.getItem("x25519-received") !== null) {
+    x25519ReceivedPublicKeyInput.value =
+      localStorage.getItem("x25519-received")!;
+  }
+
+  clearSharedSecretButton.addEventListener("click", () => {
+    if (!confirm("Are you sure?")) return;
+    localStorage.removeItem("x25519-received");
+    localStorage.removeItem("shared-secret");
+    window.location.reload();
+  });
+
+  findSharedSecretButton.addEventListener("click", () => {
+    if (x25519ReceivedPublicKeyInput.value.length < 1) return;
+
+    const [
+      x25519ReceivedPublicKeyBase64,
+      x25519ReceivedPublicKeySignatureBase64,
+    ] = x25519ReceivedPublicKeyInput.value.split(":");
+
+    const x25519ReceivedPublicKey = fromBase64(x25519ReceivedPublicKeyBase64);
+
+    const x25519ReceivedPublicKeySignature = fromBase64(
+      x25519ReceivedPublicKeySignatureBase64
+    );
+
+    const contacts = localStorage
+      .getItem("contacts")!
+      .split("\n")
+      .map((contact) => {
+        const [key, name] = contact.split(" ");
+        return { key: fromBase64(key), name };
+      });
+
+    const contact = contacts.find((contact) => {
+      return ed25519.verify(
+        x25519ReceivedPublicKeySignature,
+        x25519ReceivedPublicKey,
+        contact.key
+      );
+    });
+
+    if (!contact) {
+      alert("This key was signed by unknown contact. Declining.");
+      return;
+    }
+
+    const sharedSecret = x25519.getSharedSecret(
+      x25519_private,
+      x25519ReceivedPublicKey
+    );
+
+    localStorage.setItem("x25519-received", x25519ReceivedPublicKeyInput.value);
+    localStorage.setItem("shared-secret", toBase64(sharedSecret));
+
+    alert("This key was signed by " + contact.name + ". Shared secret found.");
+  });
+
+  // XChaCha20-Poly1305
+  const messageInput = document.getElementById("message") as HTMLInputElement;
+  const encryptButton = document.getElementById(
+    "encrypt-message"
+  ) as HTMLButtonElement;
+  const decryptButton = document.getElementById(
+    "decrypt-message"
+  ) as HTMLButtonElement;
+  const messageOutput = document.getElementById("result") as HTMLInputElement;
+
+  encryptButton.addEventListener("click", async () => {
+    if (messageInput.value.length < 1) return;
+    if (localStorage.getItem("shared-secret") === null) {
+      alert("Shared secret not found. Please find it first.");
+      return;
+    };
+
+    const sharedSecret = fromBase64(localStorage.getItem("shared-secret")!);
+    const nonce = randomBytes(24);
+
+    const cipher = xchacha20poly1305(sharedSecret, nonce);
+
+    const encryptedMessage = cipher.encrypt(toUTF8(messageInput.value));
+
+    messageOutput.value = toBase64(nonce) + ":" + toBase64(encryptedMessage);
+    await navigator.clipboard.writeText(messageOutput.value);
+    alert("Message encrypted and copied to clipboard");
+  });
+
+  decryptButton.addEventListener("click", async () => {
+    if (messageInput.value.length < 1) return;
+    if (localStorage.getItem("shared-secret") === null) {
+      alert("Shared secret not found. Please find it first.");
+      return;
+    };
+
+    const sharedSecret = fromBase64(localStorage.getItem("shared-secret")!);
+
+    const [nonceBase64, encryptedMessageBase64] = messageInput.value.split(":");
+    const nonce = fromBase64(nonceBase64);
+    const encryptedMessage = fromBase64(encryptedMessageBase64);
+
+    const cipher = xchacha20poly1305(sharedSecret, nonce);
+
+    messageOutput.value = fromUTF8(cipher.decrypt(encryptedMessage));
+    await navigator.clipboard.writeText(messageOutput.value);
+    alert("Message decrypted and copied to clipboard");
+  });
+</script>
