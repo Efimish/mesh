@@ -4,6 +4,7 @@
   "description": "A decentralized messaging app",
   "start_url": ".",
   "display": "standalone",
+  "theme_color": "#3291ff",
   "icons": [
     {
       "src": "/favicon-192.png",
